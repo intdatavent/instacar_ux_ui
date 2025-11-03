@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestione Immagini</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.0/jszip.min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: #333;
+    }
+    h1 {
+      color: #2a7de1;
+    }
+    .container {
+      background: white;
+      padding: 2rem;
+      border-radius: 1rem;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      max-width: 600px;
+      width: 100%;
+    }
+    .field {
+      margin-bottom: 1rem;
+    }
+    .field input {
+      width: 100%;
+      padding: 0.6rem;
+      border: 1px solid #ccc;
+      border-radius: 0.5rem;
+    }
+    .drop-zone {
+      margin-top: 1rem;
+      padding: 2rem;
+      border: 2px dashed #aaa;
+      border-radius: 1rem;
+      text-align: center;
+      background: #fafafa;
+      cursor: pointer;
+    }
+    .drop-zone.dragover {
+      background: #e0f3ff;
+      border-color: #2a7de1;
+    }
+    .button {
+      margin-top: 1rem;
+      background: #2a7de1;
+      color: white;
+      border: none;
+      padding: 0.8rem 1.5rem;
+      border-radius: 0.5rem;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    .button:hover {
+      background: #1b5dbf;
+    }
+    .image-list {
+      margin-top: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .image-list img {
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      border-radius: 0.5rem;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    #fileInput {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>InstaCar Backend Console</h1>
+    <div class="field">
+      <label>URL server (https):</label>
+      <input type="text" id="serverUrl" placeholder="https://192.168.1.100:5000" />
+    </div>
+    <div class="field">
+      <label>Nome Cartella:</label>
+      <input type="text" id="folderName" placeholder="Inserisci nome cartella" />
+    </div>
+    <div class="drop-zone" id="dropZone" onclick="fileInput.click()">Trascina qui le immagini o clicca per selezionarle</div>
+    <input type="file" id="fileInput" multiple accept="image/*" />
+    <div class="image-list" id="preview"></div>
+    <button class="button" onclick="uploadImages()">Invia Immagini</button>
+    <button class="button" onclick="scaricaZip()">Scarica ZIP</button>
+    <button class="button" onclick="runBackend()">Processa</button>
+  </div>
+
+  <script>
+    let images = [];
+
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const preview = document.getElementById('preview');
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      clearImages();
+      handleFiles(e.dataTransfer.files);
+    });
+
+    fileInput.addEventListener('change', () => {
+      clearImages();
+      handleFiles(fileInput.files);
+    });
+
+    function handleFiles(files) {
+      images = [];
+      for (let file of files) {
+        if (file.type.startsWith('image/')) {
+          images.push(file);
+          const img = document.createElement('img');
+          img.src = URL.createObjectURL(file);
+          preview.appendChild(img);
+        }
+      }
+    }
+
+    function clearImages() {
+      preview.innerHTML = '';
+      images = [];
+    }
+
+    async function uploadImages() {
+      const url = document.getElementById('serverUrl').value;
+      const folder = document.getElementById('folderName').value;
+      if (!url || !folder || images.length === 0) {
+        alert('Inserisci URL, cartella e almeno un\'immagine');
+        return;
+      }
+
+      let result = 1;
+      for (let img of images) {
+        const formData = new FormData();
+        formData.append('uploaded_file', img);
+        const endpoint = new URL(url);
+        endpoint.searchParams.set('folder', folder);
+        const response = await fetch(endpoint.toString(), {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok)
+          result = 0;
+      }
+
+      if (Boolean(result))
+        alert('Immagini caricate con successo');
+      else
+        alert('Errore nel caricamento di alcune o tutte le immagini');
+    }
+
+    async function runBackend() {
+      const url = document.getElementById('serverUrl').value;
+      const folder = document.getElementById('folderName').value;
+      if (!url || !folder) {
+        alert('Inserisci URL e cartella');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('run', 'True');
+      const endpoint = new URL(url);
+      endpoint.searchParams.set('folder', folder);
+      const response = await fetch(endpoint.toString(), {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok)
+          alert("Errore nell'invio del comando: controlla l\'esistenza della cartella");
+      else
+        alert("Comando inviato con successo");
+    }
+
+    async function scaricaZip() {
+      const url = document.getElementById('serverUrl').value;
+      const folder = document.getElementById('folderName').value;
+
+      if (!url || !folder) {
+        alert('Inserisci URL e cartella');
+        return;
+      }
+
+      try {
+        const endpoint = new URL(url);
+        endpoint.searchParams.set('folder', folder);
+        const response = await fetch(endpoint.toString());
+        if (!response.ok) {
+          alert("Errore nel download dello ZIP");
+          return;
+        }
+
+        const blob = await response.blob();
+
+        const downloadUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = downloadUrl;
+        a.download = `${folder}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(downloadUrl);
+
+        const zip = await JSZip.loadAsync(blob);
+
+        clearImages(); // clear previous images
+
+        for (const filename of Object.keys(zip.files)) {
+          const file = zip.files[filename];
+
+          if (!file.dir && /\.(png|jpe?g|gif)$/i.test(filename)) {
+            const content = await file.async("blob");
+            const img = document.createElement("img");
+            img.src = URL.createObjectURL(content);
+            img.style.display = "block"; // One image per row
+            img.style.width = "100%";    // Make images large and clear
+            img.style.marginBottom = "1rem";
+            preview.appendChild(img);
+          }
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Errore durante la visualizzazione delle immagini");
+      }
+    }
+
+
+  </script>
+
+</body>
+</html>
+

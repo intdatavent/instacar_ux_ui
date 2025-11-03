@@ -1,0 +1,6 @@
+path: /media/flexsight/DATA3/INSTACar_data/yolofulldata_Instacar_MULTIMEDIATECHLABYOLO
+train: train
+validation: valid
+
+class_num: 3
+class_list: ['car', 'plate', 'window']
